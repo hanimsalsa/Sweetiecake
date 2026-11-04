@@ -497,7 +497,7 @@
 </div></div>
 <div class="overlay" id="rcptOverlay"><div class="modal"><div class="mhead"><div class="b2">Sweetie Cake</div><small>085796358109 · @sweetiecake.pml</small></div><div class="mbody"><div class="rcpt" id="rcptBody"></div></div><div class="mfoot" style="flex-wrap:wrap"><button class="btn pay-btn" onclick="printReceiptAuto()" style="flex:1 1 100%">🖨️ Cetak Struk</button><button class="btn sec-btn" onclick="waReceiptShare()" style="flex:1 1 100%;background:#e7f8ec;color:#1a7a3a">📲 Kirim Struk via WhatsApp</button><button class="btn sec-btn" onclick="waPdfSend()" style="flex:1 1 100%;background:#e7f8ec;color:#1a7a3a">📄 Kirim WhatsApp: PDF + Teks</button><button class="btn sec-btn" onclick="shareReceipt()" style="flex:1 1 90px">📤 Share</button><button class="btn sec-btn" onclick="copyReceipt()" style="flex:1 1 80px">📋 Salin</button><button class="btn sec-btn" onclick="openPrinterPanel()" style="flex:1 1 90px">⚙️ Printer</button><button class="btn sec-btn" onclick="closeRcpt()" style="flex:1 1 80px">Selesai</button></div></div></div>
 
-<div class="overlay" id="reprintOverlay" style="z-index:75"><div class="modal" style="max-width:420px"><div class="mhead"><div class="b2">🖨️ Cetak Ulang Struk</div><small>cetak ke-2 dst wajib alasan — tercatat &amp; owner diberi tahu</small></div><div class="mbody">
+<div class="overlay" id="reprintOverlay" style="z-index:75"><div class="modal" style="max-width:420px"><div class="mhead"><div class="b2">🖨️ Cetak Ulang Struk</div><small>cetak + buka laci ke-2 dst wajib alasan — tercatat &amp; owner diberi tahu</small></div><div class="mbody">
   <div id="rpInfo" style="font-size:13px;margin-bottom:10px"></div>
   <div class="field"><label>Alasan cetak ulang (wajib)</label><select id="rpReason"></select></div>
   <div class="field"><label>Keterangan (wajib bila "Lainnya")</label><input id="rpNote" placeholder="mis. kertas printer macet"></div>
@@ -2306,7 +2306,15 @@ function buildReportText(date,withMoney){const s=dayStats(date),d=new Date(date+
   const ds=dessertItems();
   if(ds.length){L.push("");L.push("🍩 STOK DESSERT (awal + masuk − terjual − lain = sisa)");
     ds.forEach(it=>{const x=dessertDay(it,date);if(!(x.awal||x.masuk||x.terjual||x.lain||x.adj||x.sisa))return;L.push("• "+dsLabel(it)+": "+x.awal+" + "+x.masuk+" − "+x.terjual+" − "+x.lain+(x.adj?(x.adj>0?" + koreksi ":" − koreksi ")+Math.abs(x.adj):"")+" = "+x.sisa+" "+it.unit+(x.low?" ⚠️ menipis":""));});}
-  if(s.drawers.length){L.push("");L.push("🔓 Buka laci: "+s.drawers.length+"x");s.drawers.forEach(x=>L.push("   • "+fmtHM(x.ts)+" "+x.by+" — "+x.reason+(x.note?" ("+x.note+")":"")));}
+  if(s.drawers.length){const au=s.drawers.filter(x=>x.auto&&!x.reprint),oth=s.drawers.filter(x=>!(x.auto&&!x.reprint)),kc2={};
+    au.forEach(x=>{const k=String(x.reason||"").replace(/^Cetak struk /,"")||"-";kc2[k]=(kc2[k]||0)+1;});
+    L.push("");L.push("🔓 BUKA LACI: "+s.drawers.length+"x");
+    if(au.length)L.push("   • Otomatis saat cetak struk: "+au.length+"x ("+Object.keys(kc2).map(k=>k+" "+kc2[k]).join(" · ")+")");
+    if(oth.length){L.push("   • Manual / cetak ulang berizin: "+oth.length+"x");oth.forEach(x=>L.push("      - "+fmtHM(x.ts)+" "+x.by+" — "+x.reason+(x.note?" ("+x.note+")":"")));}}
+  const rpa=auditLog.filter(a=>a.type==="reprint"&&dkey(new Date(a.ts))===date).sort((a,b)=>String(a.ts)<String(b.ts)?-1:1);
+  if(rpa.length){L.push("");L.push("🖨️ CETAK ULANG STRUK (wajib alasan): "+rpa.length+"x");rpa.slice(0,25).forEach(a=>L.push("   • "+fmtHM(a.ts)+" "+(a.by||"-")+" — "+(a.detail||"")));if(rpa.length>25)L.push("   …dan "+(rpa.length-25)+" lainnya");}
+  const lowS=inventory.filter(i=>i.active!==false&&i.cat!==DS_CAT&&(+i.stock||0)<(+i.minStock||0));
+  if(lowS.length){L.push("");L.push("📦 STOK MENIPIS ("+lowS.length+" item): "+lowS.slice(0,25).map(i=>i.name+" ("+(+i.stock||0)+")").join(", ")+(lowS.length>25?" …+"+(lowS.length-25)+" lainnya":""));}
   if(withMoney){
     const logs=auditLog.filter(a=>dkey(new Date(a.ts))===date&&!(a.byId==="owner"&&a.type==="login")).sort((a,b)=>String(a.ts)<String(b.ts)?-1:1);
     L.push("");L.push("📋 LOG AKTIVITAS DI APLIKASI ("+logs.length+")");if(!logs.length)L.push("   (tidak ada aktivitas tercatat)");
@@ -3094,13 +3102,13 @@ saveDessertNew=function(){
          cetak ke-2 wajib alasan, kirim WA: PDF + teks
    ====================================================================== */
 const PR_REASONS=["Struk pertama tidak keluar / printer error","Kertas habis / macet","Pelanggan minta salinan","Salah cetak / terpotong","Lainnya"];
-/* jenis struk: hanya pre-order yang menerima DP (belum lunas) atau pelunasan (setelah DP) */
-function prKind(t){if(!t||t.type!=="po"||t.free)return null;const P=t.payments||[];if(!P.length)return null;
-  const first=P[0],last=P[P.length-1];
+/* jenis struk: Transaksi baru (lunas langsung) · DP (belum lunas) · Pelunasan (setelah DP). Order gratis tidak ikut. */
+function prKind(t){if(!t||t.free)return null;const P=t.payments||[];if(!P.length)return null;
+  const first=P[0],last=P[P.length-1],at=Date.parse(last.ts)||Date.parse(t.ts)||0;
   const settled=!!t._settled||(P.length>1&&Date.parse(last.ts)-Date.parse(first.ts)>2000);
-  if(t.paymentStatus==="dp")return {kind:"DP",sig:"dp:"+P.length+":"+last.ts,at:Date.parse(last.ts)};
-  if(t.paymentStatus==="lunas"&&settled)return {kind:"Pelunasan",sig:"lunas:"+P.length+":"+last.ts,at:Date.parse(last.ts)};
-  return null;}
+  if(t.paymentStatus==="dp")return {kind:"DP",sig:"dp:"+P.length+":"+last.ts,at:at};
+  if(settled&&t.paymentStatus==="lunas")return {kind:"Pelunasan",sig:"lunas:"+P.length+":"+last.ts,at:at};
+  return {kind:"Transaksi",sig:"trx:"+P.length+":"+last.ts,at:at};}
 function prCount(t,sig){return (t.prints||[]).filter(x=>x.sig===sig).length;}
 const _applySettle12=applySettlePayments;
 applySettlePayments=function(t){const n=(t.payments||[]).length;_applySettle12(t);if((t.payments||[]).length>n)t._settled=true;};
@@ -3123,24 +3131,31 @@ printReceiptAuto=async function(){
   try{await _printAuto12();}finally{kickNext=false;prBusy=false;}
   if(fresh&&kickUsed){rec.drawer=true;
     drawerLog.unshift({id:uid("DR"),ts:new Date().toISOString(),by:ME?ME.name:"",byId:ME?ME.id:"",reason:"Cetak struk "+g.kind,note:t.id+" (otomatis)",auto:true});
-    audit("drawer_open","Laci dibuka otomatis — cetak struk "+g.kind+" "+t.id+" ("+((t.customer&&t.customer.name)||"umum")+")");
     toast("🔓 Laci terbuka · struk "+g.kind+" tercetak");}
   else if(fresh)toast("Struk tercetak. Laci tidak terbuka otomatis — printer Bluetooth belum tersambung. Buka manual lewat tombol 🔓 Laci.",5600);
   save();offerWa(t);};
 /* cetak ke-2 dst: wajib alasan, laci tidak dibuka lagi */
 let reprintCtx=null;
 function openReprint(t,g,nth){reprintCtx={t:t,g:g,nth:nth};
-  document.getElementById("rpInfo").innerHTML="Struk <b>"+g.kind+"</b> · <b>"+esc(t.id)+"</b> sudah pernah dicetak dan laci sudah dibuka. Cetak ke-"+nth+" wajib diberi alasan (laci tidak dibuka lagi).";
+  document.getElementById("rpInfo").innerHTML="Struk <b>"+g.kind+"</b> · <b>"+esc(t.id)+"</b> sudah pernah dicetak dan laci sudah dibuka. Cetak ke-"+nth+" wajib diberi alasan — struk dicetak dan laci dibuka lagi, tercatat.";
   document.getElementById("rpReason").innerHTML='<option value="">— pilih alasan —</option>'+PR_REASONS.map(r=>'<option>'+esc(r)+'</option>').join("");
   document.getElementById("rpNote").value="";document.getElementById("rpErr").textContent="";document.getElementById("reprintOverlay").classList.add("show");}
 function closeReprint(){document.getElementById("reprintOverlay").classList.remove("show");reprintCtx=null;}
-function confirmReprint(){const c=reprintCtx;if(!c)return;
+async function confirmReprint(){const c=reprintCtx;if(!c)return;
   const reason=document.getElementById("rpReason").value,note=document.getElementById("rpNote").value.trim(),err=document.getElementById("rpErr");
   if(!reason){err.textContent="Pilih alasan cetak ulang.";return;}
   if(reason==="Lainnya"&&!note){err.textContent="Isi keterangan bila memilih Lainnya.";return;}
-  const t=c.t;(t.prints=t.prints||[]).push({ts:new Date().toISOString(),by:ME?ME.name:"",sig:c.g.sig,kind:c.g.kind,nth:c.nth,drawer:false,reason:reason,note:note});
-  audit("reprint","Cetak ulang struk "+c.g.kind+" "+t.id+" (ke-"+c.nth+") — "+reason+(note?" ("+note+")":"")+" · "+((t.customer&&t.customer.name)||"umum")+", "+rp(t.total));
-  save();closeReprint();lastTxn=t;_printAuto12();}
+  if(prBusy)return;prBusy=true;
+  const t=c.t,rec={ts:new Date().toISOString(),by:ME?ME.name:"",sig:c.g.sig,kind:c.g.kind,nth:c.nth,drawer:false,reason:reason,note:note};
+  (t.prints=t.prints||[]).push(rec);closeReprint();lastTxn=t;
+  kickNext=true;kickUsed=false;
+  try{await _printAuto12();}finally{kickNext=false;prBusy=false;}
+  if(kickUsed){rec.drawer=true;
+    drawerLog.unshift({id:uid("DR"),ts:new Date().toISOString(),by:ME?ME.name:"",byId:ME?ME.id:"",reason:"Cetak ulang struk "+c.g.kind+" ke-"+c.nth+" — "+reason,note:t.id+(note?" · "+note:""),auto:true,reprint:true});
+    toast("🔓 Laci terbuka · cetak ulang ke-"+c.nth+" tercatat");}
+  else toast("Struk tercetak ulang. Laci tidak terbuka — printer Bluetooth belum tersambung.",5200);
+  audit("reprint","Cetak ulang struk "+c.g.kind+" "+t.id+" (ke-"+c.nth+") — "+reason+(note?" ("+note+")":"")+" · "+((t.customer&&t.customer.name)||"umum")+", "+rp(t.total)+(kickUsed?" · laci dibuka":" · laci tidak terbuka"));
+  save();}
 /* tombol "Cetak ulang" di detail transaksi: untuk struk DP/Pelunasan lewat aturan di atas (alasan dicatat di sana) */
 const _openDetail12=openDetail;
 openDetail=function(id){_openDetail12(id);const t=transactions.find(x=>x.id===id),b=document.getElementById("detailReprintBtn");
@@ -3150,7 +3165,7 @@ openDetail=function(id){_openDetail12(id);const t=transactions.find(x=>x.id===id
 function pdfClean(s){return String(s).replace(/[−–—]/g,"-").replace(/[×✕]/g,"x").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[^\x20-\x7E]/g,"");}
 function makeReceiptPdf(t){
   const lines=receiptText(t).split("\n").map(pdfClean);
-  const kd=prKind(t);if(kd)lines.splice(4,0,("*** STRUK "+kd.kind.toUpperCase()+" ***"));
+  const kd=prKind(t);if(kd&&kd.kind!=="Transaksi")lines.splice(4,0,("*** STRUK "+kd.kind.toUpperCase()+" ***"));
   const fs=10,cw=6,lh=13,mx=20,my=22,maxLen=lines.reduce((m,l)=>Math.max(m,l.length),0);
   const W=Math.max(200,maxLen*cw+mx*2),H=my*2+lines.length*lh;
   const esc2=s=>s.replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
@@ -3178,7 +3193,7 @@ async function waPdfSend(t){t=t||lastTxn;if(!t)return;
   setTimeout(()=>waReceipt(t),500);closeWaOffer();}
 /* tawarkan kirim WA setelah cetak pertama DP/Pelunasan */
 function waOfferOn(){try{return localStorage.getItem("sc_waoffer")!=="0";}catch(e){return true;}}
-function offerWa(t){if(!waOfferOn()||!t)return;const ph=t.customer&&t.customer.phone;
+function offerWa(t){if(!waOfferOn()||!t)return;const ph=t.customer&&t.customer.phone,kd=prKind(t);if(!ph&&!(kd&&kd.kind!=="Transaksi"))return;
   document.getElementById("woInfo").innerHTML="Kirim struk <b>"+esc(t.id)+"</b>"+(t.customer&&t.customer.name?" a.n. <b>"+esc(t.customer.name)+"</b>":"")+(ph?" ("+esc(ph)+")":"")+" ke WhatsApp dalam bentuk <b>PDF + teks</b>.";
   document.getElementById("woNever").checked=false;document.getElementById("waOfferOverlay").classList.add("show");}
 function closeWaOffer(){const n=document.getElementById("woNever");if(n&&n.checked){try{localStorage.setItem("sc_waoffer","0");}catch(e){}}document.getElementById("waOfferOverlay").classList.remove("show");}

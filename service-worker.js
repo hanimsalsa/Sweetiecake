@@ -1,7 +1,7 @@
 // Service Worker — Sweetie Cake POS (v4)
 // Halaman utama: ambil versi terbaru dari internet bila ada, kalau offline pakai salinan tersimpan.
 // File lain (ikon, pustaka Excel): pakai salinan tersimpan, perbarui di belakang layar.
-const CACHE = "sweetiecake-v19";
+const CACHE = "sweetiecake-v20";
 const SHELL = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png",
   "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"];
 
