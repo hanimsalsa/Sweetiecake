@@ -213,6 +213,14 @@
 .kpi.good{background:#fff8e6}
 .priceedit input{min-width:104px}
 </style>
+<style>
+/* V12: tablet landscape (700–900px) tetap tampil 2 kolom: menu + keranjang */
+@media (orientation:landscape) and (min-width:700px) and (max-width:900px){
+  .layout{grid-template-columns:1fr 330px}.catalog{padding-bottom:14px}
+  .cart{position:static;transform:none;max-height:none;border-left:1.5px solid var(--line);border-radius:0;box-shadow:none;transition:none}
+  .mobilebar{display:none!important}.cart-close{display:none!important}
+  header{flex-wrap:nowrap}nav{order:0;flex:1 1 auto;max-width:none;margin-left:0;flex-basis:auto}.grid2c{grid-template-columns:1fr 1fr}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -487,8 +495,19 @@
   </div>
   <div class="mfoot" style="flex-wrap:wrap"><button class="btn sec-btn" onclick="closePay()" style="flex:1 1 100px">Batal</button><button class="btn" id="saveOrderBtn" onclick="saveOrder()" style="flex:1 1 130px;background:#fff3d9;color:#b8841f">💾 Simpan Order<br><span style="font-size:10px;font-weight:600">(bayar nanti)</span></button><button class="btn pay-btn" id="confirmPay" onclick="finishPay()" style="flex:1 1 130px">Selesai &amp; Cetak</button></div>
 </div></div>
-<div class="overlay" id="rcptOverlay"><div class="modal"><div class="mhead"><div class="b2">Sweetie Cake</div><small>085796358109 · @sweetiecake.pml</small></div><div class="mbody"><div class="rcpt" id="rcptBody"></div></div><div class="mfoot" style="flex-wrap:wrap"><button class="btn pay-btn" onclick="printReceiptAuto()" style="flex:1 1 100%">🖨️ Cetak Struk</button><button class="btn sec-btn" onclick="waReceiptShare()" style="flex:1 1 100%;background:#e7f8ec;color:#1a7a3a">📲 Kirim Struk via WhatsApp</button><button class="btn sec-btn" onclick="shareReceipt()" style="flex:1 1 90px">📤 Share</button><button class="btn sec-btn" onclick="copyReceipt()" style="flex:1 1 80px">📋 Salin</button><button class="btn sec-btn" onclick="openPrinterPanel()" style="flex:1 1 90px">⚙️ Printer</button><button class="btn sec-btn" onclick="closeRcpt()" style="flex:1 1 80px">Selesai</button></div></div></div>
+<div class="overlay" id="rcptOverlay"><div class="modal"><div class="mhead"><div class="b2">Sweetie Cake</div><small>085796358109 · @sweetiecake.pml</small></div><div class="mbody"><div class="rcpt" id="rcptBody"></div></div><div class="mfoot" style="flex-wrap:wrap"><button class="btn pay-btn" onclick="printReceiptAuto()" style="flex:1 1 100%">🖨️ Cetak Struk</button><button class="btn sec-btn" onclick="waReceiptShare()" style="flex:1 1 100%;background:#e7f8ec;color:#1a7a3a">📲 Kirim Struk via WhatsApp</button><button class="btn sec-btn" onclick="waPdfSend()" style="flex:1 1 100%;background:#e7f8ec;color:#1a7a3a">📄 Kirim WhatsApp: PDF + Teks</button><button class="btn sec-btn" onclick="shareReceipt()" style="flex:1 1 90px">📤 Share</button><button class="btn sec-btn" onclick="copyReceipt()" style="flex:1 1 80px">📋 Salin</button><button class="btn sec-btn" onclick="openPrinterPanel()" style="flex:1 1 90px">⚙️ Printer</button><button class="btn sec-btn" onclick="closeRcpt()" style="flex:1 1 80px">Selesai</button></div></div></div>
 
+<div class="overlay" id="reprintOverlay" style="z-index:75"><div class="modal" style="max-width:420px"><div class="mhead"><div class="b2">🖨️ Cetak Ulang Struk</div><small>cetak ke-2 dst wajib alasan — tercatat &amp; owner diberi tahu</small></div><div class="mbody">
+  <div id="rpInfo" style="font-size:13px;margin-bottom:10px"></div>
+  <div class="field"><label>Alasan cetak ulang (wajib)</label><select id="rpReason"></select></div>
+  <div class="field"><label>Keterangan (wajib bila "Lainnya")</label><input id="rpNote" placeholder="mis. kertas printer macet"></div>
+  <div class="pinerr" id="rpErr"></div>
+</div><div class="mfoot"><button class="btn sec-btn" onclick="closeReprint()">Batal</button><button class="btn pay-btn" onclick="confirmReprint()">Cetak</button></div></div></div>
+<div class="overlay" id="waOfferOverlay" style="z-index:74"><div class="modal" style="max-width:400px"><div class="mhead"><div class="b2">📲 Kirim ke WhatsApp?</div><small>struk PDF + ketikan struk sekaligus</small></div><div class="mbody">
+  <div id="woInfo" style="font-size:13px;margin-bottom:10px"></div>
+  <div class="note" style="text-align:left">Setelah ditekan, pilih <b>WhatsApp</b> lalu kontak pelanggan — PDF dan teks struk terkirim bersamaan.</div>
+  <label style="font-size:12px;display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="woNever"> Jangan tawarkan lagi di perangkat ini</label>
+</div><div class="mfoot"><button class="btn sec-btn" onclick="closeWaOffer()">Nanti</button><button class="btn pay-btn" onclick="waPdfSend()" style="background:#1a7a3a">📄 Kirim PDF + Teks</button></div></div></div>
 <div class="overlay" id="printerOverlay"><div class="modal"><div class="mhead"><div class="b2">Pengaturan Printer</div><small>pilih cara cetak yang paling mudah untuk Anda</small></div>
   <div class="mbody">
     <div id="printerStatus" style="font-size:12.5px;font-weight:600;padding:10px 12px;border-radius:10px;margin-bottom:12px"></div>
@@ -3068,6 +3087,102 @@ saveDessertNew=function(){
   audit("dessert","Item "+name+": produk menu otomatis "+specs.map(s=>s.name+" ×"+s.q).join(", "),{read:true});
   save();try{renderChips();renderGrid();renderProd();}catch(e){}renderDessertTab();
   toast("Masuk menu kasir ✓ "+(made.length?made.length+" produk baru":"(produk sudah ada, dihubungkan)"));};
+
+
+/* ======================================================================
+   V12 — LACI OTOMATIS saat cetak struk DP / Pelunasan (1× per kejadian),
+         cetak ke-2 wajib alasan, kirim WA: PDF + teks
+   ====================================================================== */
+const PR_REASONS=["Struk pertama tidak keluar / printer error","Kertas habis / macet","Pelanggan minta salinan","Salah cetak / terpotong","Lainnya"];
+/* jenis struk: hanya pre-order yang menerima DP (belum lunas) atau pelunasan (setelah DP) */
+function prKind(t){if(!t||t.type!=="po"||t.free)return null;const P=t.payments||[];if(!P.length)return null;
+  const first=P[0],last=P[P.length-1];
+  const settled=!!t._settled||(P.length>1&&Date.parse(last.ts)-Date.parse(first.ts)>2000);
+  if(t.paymentStatus==="dp")return {kind:"DP",sig:"dp:"+P.length+":"+last.ts,at:Date.parse(last.ts)};
+  if(t.paymentStatus==="lunas"&&settled)return {kind:"Pelunasan",sig:"lunas:"+P.length+":"+last.ts,at:Date.parse(last.ts)};
+  return null;}
+function prCount(t,sig){return (t.prints||[]).filter(x=>x.sig===sig).length;}
+const _applySettle12=applySettlePayments;
+applySettlePayments=function(t){const n=(t.payments||[]).length;_applySettle12(t);if((t.payments||[]).length>n)t._settled=true;};
+/* sisipkan perintah "buka laci" (ESC p) di awal data struk bila diminta */
+let kickNext=false,kickUsed=false,prBusy=false;
+const _btEnc12=btEncodeReceipt;
+btEncodeReceipt=function(t){const b=_btEnc12(t);if(!kickNext)return b;kickNext=false;kickUsed=true;
+  const k=new Uint8Array([0x1b,0x70,0x00,0x19,0xfa]),o=new Uint8Array(k.length+b.length);o.set(k,0);o.set(b,k.length);return o;};
+const _printAuto12=printReceiptAuto;
+printReceiptAuto=async function(){
+  const t=lastTxn;if(!t)return;const g=prKind(t);if(!g)return _printAuto12();
+  if(prBusy)return;
+  const n=prCount(t,g.sig);
+  if(n>=1)return openReprint(t,g,n+1);
+  prBusy=true;
+  const fresh=Date.now()-g.at<30*60000;                       // struk lama (belum pernah dicetak) tidak ikut membuka laci
+  const rec={ts:new Date().toISOString(),by:ME?ME.name:"",sig:g.sig,kind:g.kind,nth:1,drawer:false};
+  (t.prints=t.prints||[]).push(rec);save();                  // dicatat dulu agar ketukan ganda tidak dianggap cetak pertama lagi
+  kickNext=fresh;kickUsed=false;
+  try{await _printAuto12();}finally{kickNext=false;prBusy=false;}
+  if(fresh&&kickUsed){rec.drawer=true;
+    drawerLog.unshift({id:uid("DR"),ts:new Date().toISOString(),by:ME?ME.name:"",byId:ME?ME.id:"",reason:"Cetak struk "+g.kind,note:t.id+" (otomatis)",auto:true});
+    audit("drawer_open","Laci dibuka otomatis — cetak struk "+g.kind+" "+t.id+" ("+((t.customer&&t.customer.name)||"umum")+")");
+    toast("🔓 Laci terbuka · struk "+g.kind+" tercetak");}
+  else if(fresh)toast("Struk tercetak. Laci tidak terbuka otomatis — printer Bluetooth belum tersambung. Buka manual lewat tombol 🔓 Laci.",5600);
+  save();offerWa(t);};
+/* cetak ke-2 dst: wajib alasan, laci tidak dibuka lagi */
+let reprintCtx=null;
+function openReprint(t,g,nth){reprintCtx={t:t,g:g,nth:nth};
+  document.getElementById("rpInfo").innerHTML="Struk <b>"+g.kind+"</b> · <b>"+esc(t.id)+"</b> sudah pernah dicetak dan laci sudah dibuka. Cetak ke-"+nth+" wajib diberi alasan (laci tidak dibuka lagi).";
+  document.getElementById("rpReason").innerHTML='<option value="">— pilih alasan —</option>'+PR_REASONS.map(r=>'<option>'+esc(r)+'</option>').join("");
+  document.getElementById("rpNote").value="";document.getElementById("rpErr").textContent="";document.getElementById("reprintOverlay").classList.add("show");}
+function closeReprint(){document.getElementById("reprintOverlay").classList.remove("show");reprintCtx=null;}
+function confirmReprint(){const c=reprintCtx;if(!c)return;
+  const reason=document.getElementById("rpReason").value,note=document.getElementById("rpNote").value.trim(),err=document.getElementById("rpErr");
+  if(!reason){err.textContent="Pilih alasan cetak ulang.";return;}
+  if(reason==="Lainnya"&&!note){err.textContent="Isi keterangan bila memilih Lainnya.";return;}
+  const t=c.t;(t.prints=t.prints||[]).push({ts:new Date().toISOString(),by:ME?ME.name:"",sig:c.g.sig,kind:c.g.kind,nth:c.nth,drawer:false,reason:reason,note:note});
+  audit("reprint","Cetak ulang struk "+c.g.kind+" "+t.id+" (ke-"+c.nth+") — "+reason+(note?" ("+note+")":"")+" · "+((t.customer&&t.customer.name)||"umum")+", "+rp(t.total));
+  save();closeReprint();lastTxn=t;_printAuto12();}
+/* tombol "Cetak ulang" di detail transaksi: untuk struk DP/Pelunasan lewat aturan di atas (alasan dicatat di sana) */
+const _openDetail12=openDetail;
+openDetail=function(id){_openDetail12(id);const t=transactions.find(x=>x.id===id),b=document.getElementById("detailReprintBtn");
+  if(t&&b&&prKind(t))b.onclick=()=>{lastTxn=t;printReceiptAuto();};};
+
+/* ---- PDF struk (dibuat langsung di aplikasi, tanpa internet) ---- */
+function pdfClean(s){return String(s).replace(/[−–—]/g,"-").replace(/[×✕]/g,"x").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/[^\x20-\x7E]/g,"");}
+function makeReceiptPdf(t){
+  const lines=receiptText(t).split("\n").map(pdfClean);
+  const kd=prKind(t);if(kd)lines.splice(4,0,("*** STRUK "+kd.kind.toUpperCase()+" ***"));
+  const fs=10,cw=6,lh=13,mx=20,my=22,maxLen=lines.reduce((m,l)=>Math.max(m,l.length),0);
+  const W=Math.max(200,maxLen*cw+mx*2),H=my*2+lines.length*lh;
+  const esc2=s=>s.replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
+  let c="BT /F1 "+fs+" Tf "+lh+" TL "+mx+" "+(H-my-fs+2)+" Td\n";
+  lines.forEach((l,i)=>{c+=(i?"T* ":"")+"("+esc2(l)+") Tj\n";});c+="ET";
+  const objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+W+" "+H+"] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    "<< /Length "+c.length+" >>\nstream\n"+c+"\nendstream","<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>"];
+  let out="%PDF-1.4\n";const off=[];
+  objs.forEach((o,i)=>{off.push(out.length);out+=(i+1)+" 0 obj\n"+o+"\nendobj\n";});
+  const xr=out.length;out+="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n"+off.map(o=>String(o).padStart(10,"0")+" 00000 n \n").join("")+
+    "trailer\n<< /Size "+(objs.length+1)+" /Root 1 0 R >>\nstartxref\n"+xr+"\n%%EOF";
+  const u=new Uint8Array(out.length);for(let i=0;i<out.length;i++)u[i]=out.charCodeAt(i)&255;
+  return new Blob([u],{type:"application/pdf"});}
+/* kirim ke WhatsApp: lembar bagikan Android membawa PDF + teks struk sekaligus (pilih kontak pelanggan di WhatsApp) */
+async function waPdfSend(t){t=t||lastTxn;if(!t)return;
+  const txt=receiptText(t),name="Struk-"+t.id+".pdf";let blob;
+  try{blob=makeReceiptPdf(t);}catch(e){toast("Gagal membuat PDF — kirim teks saja");return waReceipt(t);}
+  let file=null;try{file=new File([blob],name,{type:"application/pdf"});}catch(e){}
+  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],text:txt,title:"Struk Sweetie Cake "+t.id});audit("wa_send","Struk "+t.id+" dikirim (PDF + teks) via bagikan WhatsApp",{read:true});closeWaOffer();return;}
+    catch(e){if(e&&e.name==="AbortError")return;}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);
+  toast("PDF tersimpan di unduhan — lampirkan di chat WhatsApp (ikon 📎). Teks struk dibuka di chat.",6000);
+  setTimeout(()=>waReceipt(t),500);closeWaOffer();}
+/* tawarkan kirim WA setelah cetak pertama DP/Pelunasan */
+function waOfferOn(){try{return localStorage.getItem("sc_waoffer")!=="0";}catch(e){return true;}}
+function offerWa(t){if(!waOfferOn()||!t)return;const ph=t.customer&&t.customer.phone;
+  document.getElementById("woInfo").innerHTML="Kirim struk <b>"+esc(t.id)+"</b>"+(t.customer&&t.customer.name?" a.n. <b>"+esc(t.customer.name)+"</b>":"")+(ph?" ("+esc(ph)+")":"")+" ke WhatsApp dalam bentuk <b>PDF + teks</b>.";
+  document.getElementById("woNever").checked=false;document.getElementById("waOfferOverlay").classList.add("show");}
+function closeWaOffer(){const n=document.getElementById("woNever");if(n&&n.checked){try{localStorage.setItem("sc_waoffer","0");}catch(e){}}document.getElementById("waOfferOverlay").classList.remove("show");}
+AUDIT_LBL.wa_send=["📲","Struk dikirim WA (PDF)"];
 
 /* ---- Boot ---- */
 function injectPayExtras(){const foot=document.querySelector("#payOverlay .mfoot");if(foot&&!document.getElementById("freeBtn"))foot.insertAdjacentHTML("afterbegin",'<button class="btn" id="freeBtn" onclick="openFreeModal()" style="flex:1 1 100%;background:#eaf7ff;color:#1f6fb2">🎁 Order GRATIS (opening / konsumsi karyawan / sampel)</button>');}
